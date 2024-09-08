@@ -18,7 +18,7 @@ TRANSACTION_TYPES = {
 
 class RevolutCSVStatementParser(CsvStatementParser):
 
-    __slots__ = 'columns'
+    __slots__ = ('columns', 'product')
 
     date_format = "%Y-%m-%d %H:%M:%S"
 
@@ -54,6 +54,9 @@ class RevolutCSVStatementParser(CsvStatementParser):
 
         # Ignore pending charges
         if line[c["State"]] != "COMPLETED":
+            return None
+
+        if self.product and line[c["Product"]] != self.product:
             return None
 
         stmt_line = super().parse_record(line)
@@ -106,7 +109,8 @@ class RevolutPlugin(Plugin):
             "Description",
             "Amount",
             "Currency",
-            "Balance"
+            "Balance",
+            "Product",
         ]
 
         if set(required_columns).issubset(csv_columns):
@@ -114,6 +118,7 @@ class RevolutPlugin(Plugin):
             f.seek(0)
             parser = RevolutCSVStatementParser(f)
             parser.columns = {col: csv_columns.index(col) for col in csv_columns}
+            parser.product = self.settings.get('product')
             if 'account' in self.settings:
                 parser.statement.account_id = self.settings['account']
             else:
