@@ -5,6 +5,12 @@ from ofxstatement.plugin import Plugin
 from ofxstatement.parser import CsvStatementParser
 from ofxstatement.statement import StatementLine, Currency, Statement
 
+from datetime import datetime
+from currency_converter import CurrencyConverter
+
+converter = CurrencyConverter(fallback_on_missing_rate=True, fallback_on_wrong_date=True)
+target_currency = 'EUR'
+
 TRANSACTION_TYPES = {
     "TRANSFER": "XFER",
     "CARD_PAYMENT": "POS",
@@ -60,6 +66,15 @@ class RevolutCSVStatementParser(CsvStatementParser):
             return None
 
         stmt_line = super().parse_record(line)
+
+        tx_currency = line[c["Currency"]].strip()
+        tx_amount = float(line[c["Amount"]])
+        tx_date = datetime.strptime(line[c["Completed Date"]], self.date_format).date()
+
+        if tx_currency != target_currency:
+            converted_amount = converter.convert(tx_amount, tx_currency, target_currency, date=tx_date)
+            stmt_line.amount = converted_amount
+            stmt_line.currency = Currency(symbol=target_currency)
 
         # Generate a unique ID
         balance_content = line[c["Balance"]]
